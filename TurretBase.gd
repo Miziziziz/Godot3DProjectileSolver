@@ -1,6 +1,6 @@
 extends Spatial
 
-var projectile_speed = 50.0
+var projectile_speed = 30.0
 var projectile_gravity : float = -9.8
 var projectile = preload("res://Projectile.tscn")
 export(NodePath) var target_path
@@ -26,8 +26,35 @@ func fire():
 	
 	new_p.velocity = projectile_speed * dir
 
-const NUM_OF_ITERATIONS = 10
+
+# t = [ -2*D*St*cos(theta) ± Sqrt[ (2*D*St*cos(theta))2 + 4*(Sb2 - St2)*D2 ] ] / (2*(Sb2 - St2))
+# Vb = Vt + [(Pti - Pbi) / t]
+# cos(theta) = DotProduct( Normalize(Pbi - Pti), Normalize(Vt) )
 func calculate_direction():
+	if abs(projectile_gravity) > 0.001:
+		return calculate_direction_gravity()
+	var Pti = target.global_transform.origin
+	var Pbi = global_transform.origin
+	var D = Pti.distance_to(Pbi)
+	var Vt = target.velocity
+	var St = Vt.length()
+	var Sb = projectile_speed
+	var cos_theta = Pti.direction_to(Pbi).dot(Vt.normalized())
+	var root = sqrt(2*D*St*cos_theta + 4*(Sb*Sb - St*St)*D*D )
+	var t1 = (-2*D*St*cos_theta + root) / (2*(Sb*Sb - St*St))
+	var t2 = (-2*D*St*cos_theta - root) / (2*(Sb*Sb - St*St))
+	
+	var t = max(t1, t2)
+	if t < 0:
+		t = max(t1, t2)
+	if t < 0:
+		return null # can't hit, target too fast
+	
+	var Vb = Vt + (Pti - Pbi) / t
+	return Vb.normalized()
+
+const NUM_OF_ITERATIONS = 10
+func calculate_direction_gravity():
 	var target_cur_pos = target.global_transform.origin
 	var target_velocity = target.velocity
 	var our_pos = global_transform.origin
